@@ -48,11 +48,14 @@ app.post("/webhook", async (req, res) => {
         console.log("User message:", userMessage);
 
         // user in icebreaker mode
-        if (userProgress[sender_psid]) {
+        if (userProgress[sender_psid]?.mode === "PAGTATAYA") {
+          console.log("handleUserAnswer2 triggered for PSID:", sender_psid);
+          await handleUserAnswer2(sender_psid, userMessage);
+        } else if (userProgress[sender_psid]) {
           console.log("handleUserAnswer triggered for PSID:", sender_psid);
           await handleUserAnswer(sender_psid, userMessage);
-        } else if (userMessage === "grade9") {
-          userProgress[sender_psid] = "INTRO_STARTED"; //track intro start
+        } else if (userMessage === "grade 9" || userMessage === "grade9") {
+          userProgress[sender_psid] = "INTRO_STARTED";
           console.log(`userProgress[${sender_psid}] = INTRO_STARTED`);
           await sendIntro(sender_psid);
         } else {
@@ -93,9 +96,12 @@ app.post("/webhook", async (req, res) => {
           await sendNextActivity(sender_psid);
 
         } else if (payload === "SAAN_PO") {
-          setProgress("LESSON_PARABULA");
-          await sendParabulaLesson(sender_psid);
-
+          if (userProgress[sender_psid] === "PARABULA_LESSON") {
+            console.log("Ignored duplicate SAAN_PO during parabula lesson for PSID:", sender_psid);
+          } else {
+            setProgress("PARABULA_LESSON");
+            await sendParabulaLesson(sender_psid);
+          }
         } else if (payload === "UNDERSTOOD_PARABULA") {
           setProgress("WAITING_OPINIONATED_ANSWER");
           await sendNaunawaan(sender_psid);
@@ -135,8 +141,9 @@ app.post("/webhook", async (req, res) => {
           await sendPanuto(sender_psid);
         } else if (payload === "HANDA_NA") {
           await sendSimulan(sender_psid);
+        } else if (payload === "NAUUNAWAAN") {
+          await sendPaalam(sender_psid);
         }
-
       }
     }
 
@@ -163,7 +170,7 @@ async function sendIntro(psid) {
     await sendMessage(psid, intro2);
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, introText);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 3000));
 
     const payload = {
       recipient: { id: psid },
@@ -194,9 +201,9 @@ async function sendReadyMessage(psid) {
     await sendMessage(psid, text1);
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, text2);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2500));
     await sendMessage(psid, text3);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 3500));
 
     const payload = {
     recipient: { id: psid },
@@ -235,7 +242,6 @@ async function sendQuestion(psid, number) {
     question = "\n\nB \u200B_ \u200BB \u200BL \u200B_ \u200B_ \u200BA";
   } else if (number === 2) {
     await sendMessage(psid, "Sumunod?");
-    await new Promise((r) => setTimeout(r, 1000));
     await sendImage(psid, "https://i.imgur.com/gkt7Kr9.jpg");
     question = "G \u200B_ \u200BS \u200BT \u200B_ \u200B_ \u200BO \u200B_";
   } else if (number === 3) {
@@ -244,7 +250,7 @@ async function sendQuestion(psid, number) {
     question = "\n\n\u200B_ \u200BA \u200B_ \u200BA \u200BS \u200B_ \u200BL \u200BA \u200B_ \u200B_ \u200BN";
   } else {
     await sendMessage(psid, `🥰 Ayan! Maraming salamat sa pagsagot!`);
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1000));
 
     // start parabula
     const questionPayload = {
@@ -273,7 +279,13 @@ async function sendQuestion(psid, number) {
 
 // parabula lesson
 async function sendParabulaLesson(psid) {
+    if (userProgress[psid] !== "PARABULA_LESSON") {
     userProgress[psid] = "PARABULA_LESSON";
+    console.log("userProgress set to PARABULA_LESSON for PSID:", psid);
+    } else {
+      console.log("user already in PARABULA_LESSON for PSID:", psid);
+    }
+
     const parabula1 = "🤓 Ang ating magiging talakayan ay patungkol sa 𝗽𝗮𝗿𝗮𝗯𝘂𝗹𝗮!";
     const parabula2 = "🧐 𝗦𝗶𝗿 𝗚𝗼, ano po ba ang 𝗽𝗮𝗿𝗮𝗯𝘂𝗹𝗮?";
     const parabula3 = `📖 Ang 𝗽𝗮𝗿𝗮𝗯𝘂𝗹𝗮 ay isang maikling kuwento na nagtuturo ng 𝗮𝗿𝗮𝗹 𝘀𝗮 𝗺𝗼𝗿𝗮𝗹 𝗮𝘁 𝗲𝘀𝗽𝗶𝗿𝗶𝘁𝘄𝗮𝗹 𝗻𝗮 𝗮𝘀𝗽𝗲𝘁𝗼 𝗻𝗴 𝗯𝘂𝗵𝗮𝘆. Karaniwang ito ay batay sa mga aral ni Hesus mula sa Bibliya, ngunit maaari rin itong gamitin sa mas malawak na konteksto bilang kuwentong may 𝘁𝗮𝗹𝗶𝗻𝗵𝗮𝗴𝗮 𝗼 𝘀𝗶𝗺𝗯𝗼𝗹𝗶𝘀𝗺𝗼 na nagtuturo ng mabuting asal.`;
@@ -285,13 +297,13 @@ async function sendParabulaLesson(psid) {
     await sendMessage(psid, parabula1);
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, parabula2);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
     await sendMessage(psid, parabula3);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 5000));
     await sendMessage(psid, parabula4);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 5000));
     await sendMessage(psid, parabula5);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
 
   const understoodPayload = {
     recipient: { id: psid },
@@ -308,18 +320,20 @@ async function sendParabulaLesson(psid) {
   };
 
   await callSendAPI(understoodPayload);
+  console.log("Finished reading and sent NABASA_NA prompt for PSID:", psid);
+  return;
 }
 
 //nauunawaan with opinionated answer
 async function sendNaunawaan(psid) {
     
     const nauunawaan1 = `✅ Okay, sige!`;
-    const nauunawaan2 = `🤔 Kung talagang nauunawaan mo. Ano nga uli ang 𝗽𝗮𝗿𝗮𝗱𝘂𝗹𝗮?\n\n(Ipahayag ang sagot.)`;
+    const nauunawaan2 = `🤔 Kung talagang nauunawaan mo. Ano nga uli ang 𝗽𝗮𝗿𝗮𝗯𝘂𝗹𝗮?\n\n(Ipahayag ang sagot.)`;
 
     console.log("sendNaunawaan for PSID:", psid);
 
     await sendMessage(psid, nauunawaan1);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1500));
     await sendMessage(psid, nauunawaan2);
     await new Promise((r) => setTimeout(r, 1000));
 
@@ -334,8 +348,9 @@ async function handleOpinionatedAnswer(psid) {
     await sendMessage(psid, "✅ Ayan! Mahusay!");
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, "📖 Sa madaling sabi, ito ay kuwentong may aral na nagtuturo ng mabuting asal at pananampalataya.");
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
     await sendMessage(psid, "📖 Dagdag pa na ang parabula ay isinusulat upang magturo, hindi lang para maglibang at magbigay aliw.");
+    await new Promise((r) => setTimeout(r, 1500));
 
     const understood2Payload = {
     recipient: { id: psid },
@@ -369,9 +384,9 @@ async function sendNotNaunawaan(psid) {
     await sendMessage(psid, notnicemsg);
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, explain1);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
     await sendMessage(psid, explain2);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1500));
 
     const understood2Payload = {
     recipient: { id: psid },
@@ -404,7 +419,7 @@ async function sendNextNaunawaan(psid) {
     await sendMessage(psid, nicemsg);
     await new Promise((r) => setTimeout(r, 1000));
     await sendMessage(psid, pagbasa);
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const pagbasaPayload = {
     recipient: { id: psid },
@@ -443,11 +458,11 @@ async function sendParabulaPagbasa(psid) {
     console.log("Begin reading for PSID:", psid);
 
     await sendMessage(psid, pagbasa1);
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 10000));
     await sendMessage(psid, pagbasa2);
-    await new Promise((r) => setTimeout(r, 9000));
+    await new Promise((r) => setTimeout(r, 10000));
     await sendMessage(psid, pagbasa3);
-    await new Promise((r) => setTimeout(r, 9000));
+    await new Promise((r) => setTimeout(r, 10000));
     await sendMessage(psid, pagbasa4);
     await new Promise((r) => setTimeout(r, 9000));
 
@@ -475,7 +490,7 @@ async function sendNabasaNa(psid) {
   userProgress[psid] = "WAITING_OPINIONATED_ANSWER2";
   console.log("sendNabasaNa for PSID:", psid, " — state set to WAITING_OPINIONATED_ANSWER");
 
-  const done = `⭐ Kung gayon! Mula sa iyong nabasang parabula, ano ang napansin mo?\n\n(Ipahayag ang sagot).`;
+  const done = `⭐ Kung gayon! Mula sa iyong nabasang parabula, ano ang napansin mo?\n\n(Ipahayag ang sagot.)`;
 
   await sendMessage(psid, done);
   await new Promise((r) => setTimeout(r, 1000));
@@ -490,6 +505,7 @@ async function handleOpinionatedAnswerV2(psid) {
   await new Promise((r) => setTimeout(r, 1000));
 
   await sendMessage(psid, `🤩 Ito rin ay naglalaman ng mga matatalinhagang mga pahayag at mga salita. Pinapakita rin dito sa kwento na kung saan, ang anak ay isang maalibugha o sobrang gastos at hindi marunong magpahalaga sa pera dahil sinasayang o ginagasta niya ito sa maling paraan.`);
+  await new Promise((r) => setTimeout(r, 3000));
 
   const magpatuloyPayload = {
     recipient: { id: psid },
@@ -516,11 +532,11 @@ async function sendMagpatuloy(psid) {
   const msg3 = `😇 Ang ama sa parabula ay sumasagisag sa Diyos na mapagpatawad at laging handang tanggapin ang kanyang mga anak na nagsisisi. Itinuturo rin nito ang kahalagahan ng kababaang-loob sa pagkilala ng sariling pagkukulang at ang pagpapatawad sa kapwa.`;
 
   await sendMessage(psid, msg1);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 3000));
   await sendMessage(psid, msg2);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 3500));
   await sendMessage(psid, msg3);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 5500));
 
   const naunawaanparabulaPayload = {
     recipient: { id: psid },
@@ -552,9 +568,9 @@ async function sendBalikan(psid) {
   await sendMessage(psid, balikan);
   await new Promise((r) => setTimeout(r, 1000));
   await sendMessage(psid, msg1);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 3500));
   await sendMessage(psid, msg2);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 3000));
 
   const naunawaanparabula2Payload = {
     recipient: { id: psid },
@@ -576,14 +592,14 @@ async function sendBalikan(psid) {
 }
 
 async function sendAyanan(psid) {
-  const ayaaaan = `🤓  Ayaaan! Sige!`
-  const ayaaaan2 = `Ngayon ay dumako na tayo sa ating pagtataya upang malaman natin kung talagang may natutuhan kayo!
-`
+  const ayaaaan = `🤓  Ayaaan! Sige!`;
+  const ayaaaan2 = `Ngayon ay dumako na tayo sa ating pagtataya upang malaman natin kung talagang may natutuhan kayo!`;
 
+//naunawaan 
   await sendMessage(psid, ayaaaan);
   await new Promise((r) => setTimeout(r, 1000));
   await sendMessage(psid, ayaaaan2);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 1500));
 
   const handakanaPayload = {
     recipient: { id: psid },
@@ -592,7 +608,7 @@ async function sendAyanan(psid) {
         type: "template",
         payload: {
           template_type: "button",
-          text: `😄 Handa ka na ba?`,
+          text: "😄 Handa ka na ba?",
           buttons: [
             { type: "postback", title: "OPO!", payload: "HANDA" },
           ],
@@ -602,6 +618,7 @@ async function sendAyanan(psid) {
   };
 
   await callSendAPI(handakanaPayload);
+  console.log("Sent HANDA button to PSID:", psid);
 }
 
 async function sendPanuto(psid) {
@@ -611,7 +628,7 @@ async function sendPanuto(psid) {
   await sendMessage(psid, panuto1);
   await new Promise((r) => setTimeout(r, 1000));
   await sendMessage(psid, panuto2);
-  await new Promise((r) => setTimeout(r, 1000));
+  await new Promise((r) => setTimeout(r, 1500));
 
   const quizhandaPayload = {
     recipient: { id: psid },
@@ -634,9 +651,46 @@ async function sendPanuto(psid) {
 
 async function sendSimulan(psid) {
   const panuto1 = `✅ Sige, ating nang simulan!`;
-
   await sendMessage(psid, panuto1);
+  userProgress[psid] = 1; // start question 1
+  await new Promise((r) => setTimeout(r, 1000));
+  await sendPagtataya(psid, 1);
 }
+
+
+async function sendPagtataya(psid, number = 1) {
+  let question = "";
+
+  console.log("sendPagtataya for PSID:", psid, "number:", number);
+
+  if (number === 1) {
+    await sendMessage(psid, "𝟭. Ang mga parabula ay nababasa partikular sa bagong tipan ng bibliya ito matatagpuan na naglalaman ng moral at espiritwal na aspekto ng buhay.");
+    question = "A. TAMA\nB. MALI\nC. Both A & B.";
+  } else if (number === 2) {
+    await sendMessage(psid, "𝟮. Ang parabula ay isang uri ng maikling kuwento na nagtuturo ng ______?");
+    question = "A. Aral sa moral at espiritwal na aspeto ng buhay.\nB. Nagtuturo ng mga maling adikhain.\nC. Nagpapakita ng mga kwento na ang pangunahing tauhan ay hayop.";
+  } else if (number === 3) {
+    await sendMessage(psid, "𝟯. Nilustay ng anak ang kanyang pera sa maling paraan. Ano ang ibig-sabihin ng matalinhagang salitang naka-mariin?");
+    question = "A. Tinipid.\nB. Tinabi.\nC. Ginastos.";
+  } else if (number === 4) {
+    await sendMessage(psid, "𝟰. Nagliwanag ang kanyang diwa at naantig ang kanyang puso sa pagnanais na bumalik sa kanyang ama. Ano ang ibig-sabihin ng pahayag na nagliwanag ang kanyang diwa?");
+    question = "A. Umilaw ang kanyang kaluluwa.\nB. Nagising sa katotohanan.\nC. Bumalik sa pinagmulan.";
+  } else if (number === 5) {
+    await sendMessage(psid, "𝟱.\"Ipinaliwanag ng ama na dapat silang magsaya sapagkat ang anak na minsang naligaw ay muling natagpuan, at ang dating patay sa kasalanan ay muling nabuhay sa kabutihan\". Ayon sa pahayag na iyong binasa, ang salitang matalinhagang naka-mariin ay nagpapahayag na ang anak ay?");
+    question = "A. Namatay sa paggastos ng pera.\nB. Nagbagong buhay at tinuwid ang sarili.\nC. Namatay ngunit muling nabuhay.";
+  }
+
+  await sendMessage(psid, question);
+  userProgress[psid] = { mode: "PAGTATAYA", current: number, score: userProgress[psid]?.score || 0 };
+  console.log("Cleared userProgress after icebreaker for PSID:", psid);
+  return;
+}
+
+async function sendPaalam(psid) {
+  const paalamMsg = `🤓 Ayan! Maraming salamat sa pakikibaka sa ating talakayan ngayong araw! Galingan at husayan pa sa susunod na talakayan! Paalam! 🐢`;
+  await sendMessage(psid, paalamMsg);
+}
+
 //---------------------------------------------------------------------//
 //-------------------FUNCTIONS----------------------------------------//
 // handle answers icebreaker
@@ -665,6 +719,67 @@ async function handleUserAnswer(psid, userMessage) {
     await sendQuestion(psid, 4);
   } else {
     console.log("handleUserAnswer: unexpected or incorrect answer for PSID:", psid);
+  }
+}
+
+async function handleUserAnswer2(psid, userMessage) {
+  const progress = userProgress[psid];
+  if (!progress || progress.mode !== "PAGTATAYA") return;
+
+  const current = progress.current;
+  const answer = userMessage.trim().toUpperCase(); // better to use uppercase for match
+  console.log("handleUserAnswer2: PSID:", psid, "question:", current, "answer:", answer);
+
+  // correct answers map
+  const correctAnswers = {
+    1: "A",
+    2: "A",
+    3: "C",
+    4: "B",
+    5: "B",
+  };
+
+  // store user’s answer and check if correct
+  if (answer === correctAnswers[current]) {
+    progress.score = (progress.score || 0) + 1;
+  }
+
+  // move to next question if not done
+  if (current < 5) {
+    progress.current = current + 1;
+    await new Promise((r) => setTimeout(r, 1000));
+    await sendPagtataya(psid, progress.current);
+  } else {
+    // show final results only after the last question
+    const score = progress.score || 0;
+    await new Promise((r) => setTimeout(r, 1000));
+    await sendMessage(psid, `Tapos ka na sa pagtataya!\n\n✅ Kabuuang Iskor: ${score}/5`);
+    await sendMessage(psid, "Narito ang tamang sagot:\n1. A\n2. A\n3. C\n4. B\n5. B");
+    userProgress[psid] = "PAGTATAYA_DONE";
+
+    // ✅ MOVE YOUR REFLECTION SECTION INSIDE HERE
+    await new Promise((r) => setTimeout(r, 1500));
+    await sendMessage(psid, "🥰 Ayaaan! Tunay ngang may natutuhan ang ating klase sa ating talakayan.");
+    await new Promise((r) => setTimeout(r, 1000));
+    await sendMessage(psid, "😌 Bago matapos ang ating talakayan, bilang kasunduan ay nais ko sanang sagutan mo itong mga tanong na ito sa sagutang papel para sa ating susunod na talakayan.\n\nIto ang ating mga gabay na tanong:\n\n𝟭. Ano ang katangian ng inyong magulang ang sumasalamin sa katauhan ng ama sa parabulang nabasa natin?\n\n𝟮. Paano nyo pinahahalagahan ang pagmamahal at pag-aaruga ng inyong mga magulang?");
+    await new Promise((r) => setTimeout(r, 4000));
+    await sendMessage(psid, "✅ Ayaaaaan! Nauunawaan ba ang ating buong talakayan sa araw na ito?");
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const closingPayload = {
+      recipient: { id: psid },
+      message: {
+        attachment: {
+          type: "template",
+          payload: {
+            template_type: "button",
+            text: "⭐ Maari mong pindutin ang \"NAUUNAWAAN\" sa ibaba kung nauunawaan ang ating talakayan ngayong araw.",
+            buttons: [{ type: "postback", title: "NAUUNAWAAN", payload: "NAUUNAWAAN" }],
+          },
+        },
+      },
+    };
+    await callSendAPI(closingPayload);
   }
 }
 
