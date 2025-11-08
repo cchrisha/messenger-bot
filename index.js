@@ -768,7 +768,7 @@ async function handleOpinionatedAnswerV3(psid) {
   console.log("handleOpinionatedAnswerV3 for PSID:", psid, "— state set to AFTER_OPINIONATED_ANSWER3");
 
   const msg1 = `🥰 Ayan! Salamat sa aktibong pakikibahagi sa tinalakay na aralin.`;
-  const msg2 = `Para sa huling gawain, dumako na tayo sa ating pagtataya upang malaman natin kung talagang may natutuhan kayo!`;
+  const msg2 = `PPara sa huling gawain, dumako na tayo sa ating pagtataya upang malaman natin kung talagang mayroon kang natutuhan!`;
 
   await sendMessage(psid, msg1);
   await new Promise((r) => setTimeout(r, 2000));
