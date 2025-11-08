@@ -1,12 +1,19 @@
-import e from "express";
+//remove this if di gumana
+import dotenv from "dotenv";
+
+
 import express from "express";
 import fetch from "node-fetch";
 
 const app = express();
 app.use(express.json());
 
-const VERIFY_TOKEN = "abednego26";
-const PAGE_ACCESS_TOKEN = "EAAddxc7RK0EBP3gh29JgZBK7QkCLiMsZA2QCHkQvwAVZAuQ8qnHQf2IctVy0D8NyH51kfms0quFM2aSjBYhsA8EcvccTRnBGe4Lk204TRRKbqyIA0GbAvJMtDdPGNLb0LSZBvsOKHrLLhA4PzYtMWEJDm0Qu55ctwLMcpr6ZBJMRZCOCoWZAA0oMxaZANdzbP3H190UuH7sptwZDZD";
+//remove this if di gumana
+dotenv.config();
+
+
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 
 //temporary user progress tracker
 const userProgress = {};
@@ -58,11 +65,23 @@ app.post("/webhook", async (req, res) => {
         if (userProgress[sender_psid]) {
           console.log("handleUserAnswer triggered for PSID:", sender_psid);
           await handleUserAnswer(sender_psid, userMessage);
-        } else if (userMessage === "filipino9") {
-          userProgress[sender_psid] = "INTRO_STARTED";
-          console.log(`userProgress[${sender_psid}] = INTRO_STARTED`);
-          await sendIntro(sender_psid);
-        } else {
+        } 
+        // first, check if user wants to start/restart
+        if (userMessage === "filipino9") {
+          const progress = userProgress[sender_psid];
+
+          if (!progress || progress === "PAALAM_SENT") {
+            userProgress[sender_psid] = "INTRO_STARTED";
+            console.log(`userProgress[${sender_psid}] = INTRO_STARTED`);
+            await sendIntro(sender_psid);
+          }
+        }
+        // then, handle answers only if the user is already in a lesson
+        else if (userProgress[sender_psid]) {
+          console.log("handleUserAnswer triggered for PSID:", sender_psid);
+          await handleUserAnswer(sender_psid, userMessage);
+        }
+        else {
           console.log("Ignored message:", userMessage);
         }
       }
@@ -191,6 +210,9 @@ app.post("/webhook", async (req, res) => {
         }
         else if (payload === "PAALAM") {
           await sendPaalam(sender_psid);
+        } else if (payload === "RETRY_PAGTATAYA") {
+          userProgress[sender_psid] = { mode: "PAGTATAYA", current: 1, score: 0 };
+          await sendPagtataya(sender_psid, 1);
         }
       }
     }
@@ -465,7 +487,7 @@ async function sendNotNaunawaan(psid) {
     userProgress[psid] = "RETEACHING";
     const notnicemsg = `✅ Okay, sige! Balikan natin.`;
     const explain1 = `📖 Ang 𝗽𝗮𝗿𝗮𝗯𝘂𝗹𝗮 ay isang maikling kuwento na nagtuturo ng 𝗮𝗿𝗮𝗹 𝘀𝗮 𝗺𝗼𝗿𝗮𝗹 𝗮𝘁 𝗲𝘀𝗽𝗶𝗿𝗶𝘁𝘄𝗮𝗹 𝗻𝗮 𝗮𝘀𝗽𝗲𝘁𝗼 𝗻𝗴 𝗯𝘂𝗵𝗮𝘆.`;
-    const explain2 = `📖 Mula ito sa salitang 𝗴𝗿𝗶𝘆𝗲𝗴𝗼 na “𝗽𝗮𝗿𝗮𝗯𝗼𝗹𝗲” na ang ibig sabihin ay pagtutulad o paghahambing..`;
+    const explain2 = `📖 Mula ito sa salitang 𝗴𝗿𝗶𝘆𝗲𝗴𝗼 na “𝗽𝗮𝗿𝗮𝗯𝗼𝗹𝗲” na ang ibig sabihin ay pagtutulad o paghahambing.`;
 
     console.log("sendNotNaunawaan for PSID:", psid);
 
@@ -677,7 +699,7 @@ async function sendPahayag(psid, number) {
     await callSendAPI(q3Payload);
   } else if (userProgress[psid] === "PAHAYAG3_DONE") {
     await new Promise((r) => setTimeout(r, 2000));
-    await sendMessage(psid, `✅ Mahusay! Hindi ka lamang nagpagkita ng kahusayan sa pagsuri, ipinamalas mo rin ang iyong galing sa pagbibigay ng kahulugan sa mga matatalinhagang pahayag!`);
+    await sendMessage(psid, `Hindi ka lamang nagpagkita ng kahusayan sa pagsuri, ipinamalas mo rin ang iyong galing sa pagbibigay ng kahulugan sa mga matatalinhagang pahayag!`);
     await new Promise((r) => setTimeout(r, 2000));
     sendMessage(psid, `Ipinapakita sa kuwento na gaano man kalayo o kalalim ang pagkakamali ng isang tao, laging may pagkakataon para magsisi at magbagong-buhay.`);
     await new Promise((r) => setTimeout(r, 2000));
@@ -891,6 +913,7 @@ async function sendPagtataya(psid, number) {
 
 
 async function sendPaalam(psid) {
+  userProgress[psid] = "PAALAM_SENT";
   const paalamMsg = `Ayan! Maraming salamat sa pakikibaka sa ating talakayan ngayong araw! Nawa’y mayroon kang natutuhan sa aralin ngayon! 🥰`;
   await sendMessage(psid, paalamMsg);
 }
@@ -974,7 +997,7 @@ async function handlePahayagResponse(payload, psid) {
   }
 }
 
-// PAGTATAYA HANDLER
+// PAGTATAYA HANDLER (FIXED VERSION)
 async function handlePAGTATAYA(psid, userMessage) {
   const progress = userProgress[psid];
   if (!progress || progress.mode !== "PAGTATAYA") return;
@@ -1013,29 +1036,50 @@ async function handlePAGTATAYA(psid, userMessage) {
     // Show final results only after the last question
     const score = progress.score || 0;
     await new Promise((r) => setTimeout(r, 2000));
-    await sendMessage(psid, `Kabuuang Iskor: ${score}/5`);
-    await sendMessage(psid, "Narito ang tamang sagot:\n1. A\n2. A\n3. C\n4. B\n5. B");
+    await sendMessage(psid, `Kabuuang Marka: ${score}/5`);
     userProgress[psid] = "PAGTATAYA_DONE";
 
     await new Promise((r) => setTimeout(r, 2000));
-    await sendMessage(psid, "Mahusay! Ipagpatuloy pa ang iyong pagiging tahas!");
 
-    const closingPayload = {
-      recipient: { id: psid },
-      message: {
-        attachment: {
-          type: "template",
-          payload: {
-            template_type: "button",
-            text: "✅ Nauunawaan ba ang ating aralin?",
-            buttons: [{ type: "postback", title: "OPO", payload: "PAALAM" }],
+    // ✅ Conditional message depending on score
+    if (score >= 4) {
+      await sendMessage(psid, "Mahusay! Talagang may natutuhan sa ating aralin.");
+      const closingPayload = {
+        recipient: { id: psid },
+        message: {
+          attachment: {
+            type: "template",
+            payload: {
+              template_type: "button",
+              text: "✅ Nauunawaan ba ang ating aralin?",
+              buttons: [{ type: "postback", title: "OPO", payload: "PAALAM" }],
+            },
           },
         },
-      },
-    };
-    await callSendAPI(closingPayload);
+      };
+      await callSendAPI(closingPayload);
+    } else {
+      const retryPayload = {
+        recipient: { id: psid },
+        message: {
+          attachment: {
+            type: "template",
+            payload: {
+              template_type: "button",
+              text: "Gusto mo bang bumawi sa pagsagot?",
+              buttons: [
+                { type: "postback", title: "OPO", payload: "RETRY_PAGTATAYA" },
+                { type: "postback", title: "HINDI", payload: "PAALAM" },
+              ],
+            },
+          },
+        },
+      };
+      await callSendAPI(retryPayload);
+    }
   }
 }
+
 
 // reusable text sender
 async function sendMessage(psid, text) {
